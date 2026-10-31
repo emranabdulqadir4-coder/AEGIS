@@ -4,7 +4,7 @@
 
 AEGIS is a small control plane plus a host daemon, like a task manager but for AI. The daemon watches processes on a machine (by default anything named like `python`, `node` or `ollama`), reports CPU and memory every two seconds, and executes **freeze / resume / kill** when you ask from the dashboard.
 
-![AEGIS dashboard](docs/screenshot.png)
+![AEGIS dashboard](screenshot.png)
 
 ## What it does
 
