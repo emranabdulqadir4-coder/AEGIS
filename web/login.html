@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>AEGIS – Sign in</title>
+  <link rel="stylesheet" href="/assets/tailwind.css">
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <form method="post" action="/login" class="w-full max-w-sm bg-slate-900/80 border border-slate-800 rounded-xl p-6 space-y-4">
+    <div>
+      <div class="font-bold text-lg tracking-wider">AEGIS</div>
+      <p class="text-[11px] text-slate-400 font-mono uppercase tracking-wide">Host process containment</p>
+    </div>
+    <p id="error" class="hidden text-xs text-red-400" role="alert">Incorrect password.</p>
+    <label class="block text-xs text-slate-400">
+      Password
+      <input type="password" name="password" required autofocus autocomplete="current-password"
+             class="mt-1 w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+    </label>
+    <button type="submit" class="w-full py-2 bg-cyan-700 hover:bg-cyan-600 text-white text-sm font-semibold rounded-lg transition">Sign in</button>
+  </form>
+  <script src="/assets/login.js"></script>
+</body>
+</html>
