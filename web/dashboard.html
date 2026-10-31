@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>AEGIS – Host Process Containment</title>
+  <link rel="stylesheet" href="/assets/tailwind.css">
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+  <header class="shrink-0 border-b border-slate-800 bg-slate-900/80 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <div class="font-bold text-lg tracking-wider">AEGIS</div>
+      <p class="text-[10px] text-slate-400 tracking-wide uppercase font-mono">Host process monitoring &amp; containment</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="hidden md:flex items-center gap-3 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono">
+        <span class="text-slate-400">Dashboard <span id="topConnectionStatus" class="text-amber-400">CONNECTING</span></span>
+        <span class="h-3 w-px bg-slate-800"></span>
+        <span class="text-slate-400">Hosts <span id="topDaemonStatus" class="text-red-400">OFFLINE</span></span>
+      </div>
+      <button id="freezeAllBtn" type="button" class="px-3 py-2 bg-red-700 hover:bg-red-600 text-white font-semibold text-xs rounded-lg border border-red-500/50 transition">
+        Freeze all
+      </button>
+      <form id="logoutForm" method="post" action="/logout" class="hidden">
+        <button type="submit" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 transition">Sign out</button>
+      </form>
+    </div>
+  </header>
+
+  <div id="localBanner" class="hidden shrink-0 bg-amber-950/60 border-b border-amber-800/60 text-amber-300 text-xs px-6 py-1.5">
+    Local mode: no dashboard login is configured. Set <code class="font-mono">AEGIS_DASHBOARD_PASSWORD in <strong>.env.example</strong></code> before exposing this beyond your own machine.
+  </div>
+
+  <div class="flex-1 flex overflow-hidden">
+    <aside class="hidden md:flex w-56 shrink-0 flex-col justify-between border-r border-slate-800 bg-slate-900/50">
+      <nav class="p-4 space-y-1" aria-label="Sections">
+        <button type="button" data-tab="processes" class="tab-btn w-full text-left px-3 py-2 rounded-lg text-xs font-medium">Processes</button>
+        <button type="button" data-tab="connect" class="tab-btn w-full text-left px-3 py-2 rounded-lg text-xs font-medium">Connect a host</button>
+      </nav>
+      <div class="p-4 border-t border-slate-800 text-[11px] text-slate-500 space-y-1 font-mono">
+        <div>DASHBOARD: <span id="sidebarDashboardStatus" class="text-amber-400">CONNECTING</span></div>
+        <div>HOSTS: <span id="sidebarHostCount">0 connected</span></div>
+        <div>LAST TELEMETRY: <span id="lastTelemetryStatus">NEVER</span></div>
+      </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+
+      <!-- Processes -->
+      <section id="tab-processes" class="space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+            <div class="text-xs text-slate-400">Monitored processes</div>
+            <div class="text-2xl font-extrabold font-mono mt-1" id="statTotal">0</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+            <div class="text-xs text-slate-400">Flagged (high CPU / RAM)</div>
+            <div class="text-2xl font-extrabold font-mono mt-1 text-emerald-400" id="statFlagged">0</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+            <div class="text-xs text-slate-400">Frozen</div>
+            <div class="text-2xl font-extrabold font-mono mt-1" id="statFrozen">0</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+            <div class="text-xs text-slate-400">Hosts online</div>
+            <div class="text-2xl font-extrabold font-mono mt-1" id="statHosts">0</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
+          <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 class="font-bold text-sm tracking-wide uppercase font-mono">Processes</h2>
+            <input type="search" id="searchInput" placeholder="Search PID, name, command…" aria-label="Search processes"
+                   class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-slate-200 focus:outline-none focus:border-cyan-500 font-mono text-xs w-full sm:w-64">
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-950 text-slate-400 border-b border-slate-800 font-mono text-[11px]">
+                <tr>
+                  <th class="py-3 px-4">PID</th>
+                  <th class="py-3 px-4">NAME / HOST</th>
+                  <th class="py-3 px-4">STATUS</th>
+                  <th class="py-3 px-4">CPU / RAM</th>
+                  <th class="py-3 px-4">COMMAND</th>
+                  <th class="py-3 px-4 text-right">CONTROLS</th>
+                </tr>
+              </thead>
+              <tbody id="processBody" class="divide-y divide-slate-800/60 font-mono"></tbody>
+            </table>
+          </div>
+          <p id="emptyState" class="p-6 text-center text-xs text-slate-500">
+            No host connected yet. Open <button type="button" data-tab="connect" class="underline text-cyan-400">Connect a host</button> for the one command you need.
+          </p>
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-56">
+          <div class="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-slate-400">Activity log</span>
+            <button type="button" id="clearLogBtn" class="text-[10px] text-slate-400 hover:text-slate-200 font-mono underline">Clear</button>
+          </div>
+          <div id="log" class="p-4 flex-1 overflow-y-auto font-mono text-xs space-y-1" role="log" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- Connect a host -->
+      <section id="tab-connect" class="hidden space-y-6 max-w-3xl">
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-6 space-y-4">
+          <h2 class="text-base font-bold">Connect a host</h2>
+          <p class="text-xs text-slate-400">
+            Run the AEGIS daemon on each machine you want to watch. It reports processes whose name contains
+            <code class="font-mono text-slate-300">python</code>, <code class="font-mono text-slate-300">node</code> or
+            <code class="font-mono text-slate-300">ollama</code> (change with <code class="font-mono text-slate-300">--watch</code>)
+            and can freeze, resume or kill them when you ask.
+          </p>
+          <ol class="list-decimal list-inside text-xs text-slate-300 space-y-3">
+            <li>Install the requirements on that machine:
+              <pre class="mt-2 p-3 bg-slate-950 border border-slate-800 rounded font-mono text-[11px] overflow-x-auto">pip install psutil websockets</pre>
+            </li>
+            <li>Set the shared token (the same value as <code class="font-mono">AEGIS_TOKEN</code> on the server) in a <code class="font-mono">.env</code> file next to <code class="font-mono">daemon_security.py</code>, or in your shell.</li>
+            <li>Start the daemon:
+              <pre id="connectCmd" class="mt-2 p-3 bg-slate-950 border border-slate-800 rounded font-mono text-[11px] overflow-x-auto whitespace-pre-wrap break-all"></pre>
+              <button type="button" id="copyCmdBtn" class="mt-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs font-mono transition">Copy command</button>
+            </li>
+            <li>Run it as administrator / root if you want to control processes owned by other users.</li>
+          </ol>
+          <p class="text-xs text-slate-500">When it connects, this page shows the host under “Hosts online” within a couple of seconds.</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>
